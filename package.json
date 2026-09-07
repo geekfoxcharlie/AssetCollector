@@ -1,0 +1,11 @@
+{
+  "name": "assetcollector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A passive local catalog of workflow skills. Finds and checks instructions; never executes them.",
+  "type": "module",
+  "bin": { "assetcollector": "src/cli.js" },
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": { "yaml": "^2.8.1" }
+}
