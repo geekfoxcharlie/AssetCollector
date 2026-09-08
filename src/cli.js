@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { add, CatalogError, check, context, list, show, skillsDir, template } from './catalog.js';
+import { startServer } from './web.js';
 
 const help = `AssetCollector — passive workflow skill catalog
 
@@ -11,6 +12,7 @@ assetcollector check [name]                 report document issues; never execut
 assetcollector template <name> --description <text>
                                            print an authoring template to stdout
 assetcollector context                      print agent integration instructions
+assetcollector web [--port 4125]             browse the read-only local web interface
 
 Options: --skills-dir <dir>, --json
 Catalog: --skills-dir > ASSETCOLLECTOR_SKILLS_DIR > this project's skills/
@@ -29,7 +31,7 @@ try {
     if (arg === '--json') continue;
     if (arg === '--help' || arg === '-h') { positional.unshift('help'); continue; }
     if (!arg.startsWith('--')) { positional.push(arg); continue; }
-    if (!['--skills-dir', '--description'].includes(arg)) throw new CatalogError('invalid_argument', `Unknown option ${arg}`);
+    if (!['--skills-dir', '--description', '--port'].includes(arg)) throw new CatalogError('invalid_argument', `Unknown option ${arg}`);
     const value = raw[++i];
     if (!value || value.startsWith('--') || opts.has(arg)) throw new CatalogError('invalid_argument', `${arg} requires one value and cannot be repeated.`);
     opts.set(arg, value);
@@ -37,7 +39,11 @@ try {
   command = positional.shift() ?? 'help';
   const root = skillsDir(opts.get('--skills-dir'));
   if (opts.has('--description') && command !== 'template') throw new CatalogError('invalid_argument', '--description is only for template.');
-  const arities = { help: [0, 0], list: [0, 0], search: [1, 1], show: [1, 1], add: [1, 1], check: [0, 1], template: [1, 1], context: [0, 0] };
+  if (opts.has('--port') && command !== 'web') throw new CatalogError('invalid_argument', '--port is only for web.');
+  if (command === 'web' && json) throw new CatalogError('invalid_argument', 'web does not support --json.');
+  const port = opts.get('--port') ?? '4125';
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw new CatalogError('invalid_argument', '--port must be an integer from 1 to 65535.');
+  const arities = { help: [0, 0], list: [0, 0], search: [1, 1], show: [1, 1], add: [1, 1], check: [0, 1], template: [1, 1], context: [0, 0], web: [0, 0] };
   const arity = Object.hasOwn(arities, command) ? arities[command] : undefined;
   if (!arity || positional.length < arity[0] || positional.length > arity[1]) throw new CatalogError('invalid_argument', `Invalid command or arguments. Run assetcollector help.`);
   let data;
@@ -50,6 +56,11 @@ try {
     case 'check': data = check(root, positional[0]); if (data.findings.length) process.exitCode = 1; break;
     case 'template': data = { text: template(positional[0], opts.get('--description')) }; break;
     case 'context': data = context(root); break;
+    case 'web': {
+      const server = await startServer(root, Number(port));
+      data = { text: `AssetCollector: http://127.0.0.1:${server.address().port}\nRead-only catalog: ${root}\nPress Ctrl+C to stop.\n` };
+      break;
+    }
   }
   if (json) console.log(JSON.stringify({ schemaVersion: 1, command, generatedAt: new Date().toISOString(), data, errors: [] }, null, 2));
   else if (data.text !== undefined) process.stdout.write(data.text);

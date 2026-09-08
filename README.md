@@ -2,7 +2,7 @@
 
 本地流程 skill 仓库和格式说明。回答“有没有现成做法、流程怎么写、检查项是否写清”。执行者始终是调用它的 agent。
 
-0.1 已实现：登记、列表、全文查找、读取、格式检查、模板输出、agent context。没有服务、数据库、执行器或网络调用。不预置业务流程。
+0.1 已实现：登记、列表、全文查找、读取、格式检查、模板输出、agent context 和按需启动的只读 Web。没有数据库、执行器或外部网络调用。不预置业务流程。
 
 ## 安装
 
@@ -41,6 +41,18 @@ assetcollector check skill-name --json
 - API、凭据和工具说明从 AgentPulse 查询。
 - `check` 是显式文档检查：缺少检查清单或有未完成模板时报告 findings 并返回非零。`add` 只对不可解析的元数据、非法名称和目录冲突拒绝登记；文档 findings 会随结果返回，不充当执行闸门。
 
-所有命令支持 `--json`，返回 `{schemaVersion, command, generatedAt, data, errors}`。失败退出 1；空查询退出 0；`check` 有 findings 时退出 1 且仍返回完整报告。
+除 `web` 外，所有命令支持 `--json`，返回 `{schemaVersion, command, generatedAt, data, errors}`。失败退出 1；空查询退出 0；`check` 有 findings 时退出 1 且仍返回完整报告。
+
+## 只读 Web
+
+```sh
+assetcollector web
+# 自定义端口或目录
+assetcollector web --port 4125 --skills-dir /path/to/skills
+```
+
+打开 http://127.0.0.1:4125 。页面提供流程列表、全文搜索、说明、文件位置、SKILL.md 原文和文档检查提示。直接读取现有目录，修改文件后刷新即可；空目录不会自动创建。Web 不提供登记、编辑、删除或执行功能，也不提供资源文件下载。
+
+仅监听本机 `127.0.0.1`，按 Ctrl+C 停止。默认端口与 AgentPulse（4123）、AssetHub（4124）错开，无需额外依赖或构建步骤。
 
 格式约定见 [SKILL-FORMAT.md](docs/SKILL-FORMAT.md)。跨项目接入见 [InfoStack](../InfoStack/USAGE.md)。
