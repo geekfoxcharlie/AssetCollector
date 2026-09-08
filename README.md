@@ -2,7 +2,7 @@
 
 本地流程 skill 仓库和格式说明。回答“有没有现成做法、流程怎么写、检查项是否写清”。执行者始终是调用它的 agent。
 
-0.1 已实现：登记、列表、全文查找、读取、格式检查、模板输出、agent context 和按需启动的只读 Web。没有数据库、执行器或外部网络调用。不预置业务流程。
+0.1 已实现：按命名空间登记、列表、全文查找、读取、格式检查、模板输出、`status`、agent context 和按需启动的只读 Web。没有数据库、执行器或外部网络调用。不预置业务流程；使用方流程放在用户数据目录。
 
 ## 安装
 
@@ -12,26 +12,28 @@
 npm ci
 npm test
 npm link
-assetcollector context
+assetcollector status
 ```
 
 ## 使用
 
 ```sh
+assetcollector status --json
+assetcollector namespace add tukahu
 assetcollector list --json
 assetcollector search "任务关键词" --json
-assetcollector show skill-name --json
-assetcollector template skill-name --description "何时使用及解决什么问题" > /tmp/SKILL.md
+assetcollector show tukahu/editorial-article --json
+assetcollector template editorial-article --description "何时使用及解决什么问题" > /tmp/SKILL.md
 # 在一个同名目录里完成 SKILL.md，按需要加入 references/、scripts/ 等资源
-assetcollector add /path/to/skill-name --json
-assetcollector check skill-name --json
+assetcollector add /path/to/editorial-article --namespace tukahu --json
+assetcollector check tukahu/editorial-article --json
 ```
 
-`add` 将整个目录导入 `skills/<name>/`，保留相对资源路径。导入后这份目录是仓库里的正式版本；用 `show` 找到它，直接修改文件即可更新。重复登记同名流程报错，不自动覆盖。不自动同步原目录，不扫描外部项目。导入只接受普通目录和文件，不跟随符号链接。
+`add --namespace` 将整个目录导入 `<catalog>/<namespace>/<name>/`。导入后这份目录是用户数据目录里的正式版本；用 `show` 找到它，直接修改即可更新。重复登记同名流程报错，不自动覆盖。导入只接受普通目录和文件，不跟随符号链接。
 
-目录是唯一真相。也可以直接在 `skills/` 下创建、编辑、移动出或删除完整 skill 目录，下一次查询立即生效。没有需要同步的索引。一个流程的目录名必须与 frontmatter `name` 一致。
+布局：`<catalog>/<namespace>/<skill>/SKILL.md`。通用流程用 `shared`，项目流程与 AssetHub 使用同一命名空间 id。frontmatter `name` 必须与 skill 目录名一致。`demand.workflow` 存限定名，例如 `tukahu/blog-publish`。
 
-目录位置依次取 `--skills-dir`、`ASSETCOLLECTOR_SKILLS_DIR`、本项目的 `skills/`。读空仓库返回空列表，不会生成文件。测试使用临时目录。
+目录位置依次取 `--skills-dir`、`ASSETCOLLECTOR_SKILLS_DIR`、`$XDG_DATA_HOME/assetcollector`、`~/.local/share/assetcollector`。读空目录返回空列表，不会生成文件。本仓库的 `skills/` 不是默认目录。测试使用临时目录。
 
 ## 边界
 
@@ -48,10 +50,10 @@ assetcollector check skill-name --json
 ```sh
 assetcollector web
 # 自定义端口或目录
-assetcollector web --port 4125 --skills-dir /path/to/skills
+assetcollector web --port 4125 --skills-dir /path/to/catalog
 ```
 
-打开 http://127.0.0.1:4125 。页面提供流程列表、全文搜索、说明、文件位置、SKILL.md 原文和文档检查提示。直接读取现有目录，修改文件后刷新即可；空目录不会自动创建。Web 不提供登记、编辑、删除或执行功能，也不提供资源文件下载。
+打开 http://127.0.0.1:4125 。页面按命名空间列出流程，详情路径为 `/n/<namespace>/<skill>`。直接读取现有目录，修改文件后刷新即可。空目录不会自动创建。Web 不提供登记、编辑、删除或执行功能，也不提供资源文件下载。
 
 仅监听本机 `127.0.0.1`，按 Ctrl+C 停止。默认端口与 AgentPulse（4123）、AssetHub（4124）错开，无需额外依赖或构建步骤。
 

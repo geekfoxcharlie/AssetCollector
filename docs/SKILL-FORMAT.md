@@ -1,13 +1,18 @@
 # 流程 skill 格式
 
-每个流程一个目录，入口是 `SKILL.md`。其他文件仅在流程实际需要时添加。
+每个流程一个目录，入口是 `SKILL.md`。登记后的位置是用户数据目录里的 `<namespace>/<skill-name>/`，不是本仓库。其他文件仅在流程实际需要时添加。
 
 ```text
-skill-name/
-  SKILL.md
-  references/    可选：按需阅读的资料
-  scripts/       可选：由执行 agent 决定运行的辅助脚本
-  assets/        可选：输出所需模板或静态文件
+~/.local/share/assetcollector/
+  shared/                 通用流程
+    thematic-collection/
+      SKILL.md
+  tukahu/                 与 AssetHub 相同的项目 id
+    editorial-article/
+      SKILL.md
+      references/         可选：按需阅读的资料
+      scripts/            可选：由执行 agent 决定运行的辅助脚本
+      assets/             可选：输出所需模板或静态文件
 ```
 
 ## 元数据

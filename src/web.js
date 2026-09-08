@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { list, show, validName } from './catalog.js';
+import { list, parseQualified, show } from './catalog.js';
 
 const escape = (value) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const css = `
@@ -12,13 +12,16 @@ function page(title, body) {
 function warnings(findings) {
   return findings.length ? `<aside class="warning" aria-label="文档检查提示"><strong>文档检查提示 · ${findings.length} 项</strong><ul>${findings.map(f => `<li>${f.name ? `${escape(f.name)}：` : ''}${escape(f.message)}</li>`).join('')}</ul></aside>` : '';
 }
+function hrefFor(skill) {
+  return `/n/${encodeURIComponent(skill.namespace)}/${encodeURIComponent(skill.name)}`;
+}
 function index(root, query) {
   const catalog = list(root, query);
-  return page('流程库', `<h1>流程库</h1><p class="muted">查看已登记流程的说明、原文和文档检查提示。</p><form action="/" method="get" role="search"><label for="q">搜索流程</label><div class="search"><input id="q" name="q" type="search" placeholder="名称、说明或正文" value="${escape(query)}"><button type="submit">搜索</button></div></form><p class="muted">${query ? '匹配' : '已登记'} ${catalog.skills.length} 个流程${query ? ' · <a href="/">查看全部</a>' : ''}</p>${warnings(catalog.findings)}${catalog.skills.length ? `<ul class="rows">${catalog.skills.map(s => `<li><a href="/skills/${encodeURIComponent(s.name)}">${escape(s.name)}</a><p>${escape(s.description)}</p><small class="muted">${s.findings.length ? `${s.findings.length} 项文档提示` : '文档检查：未发现问题'}</small></li>`).join('')}</ul>` : `<div class="empty"><h2>${query ? '没有匹配的流程' : '还没有登记流程'}</h2><p>${query ? '尝试其他关键词，或查看全部流程。' : '通过 CLI 登记已有流程后，这里就会显示。'}</p>${query ? '' : '<code>assetcollector add &lt;流程目录&gt;</code>'}</div>`}<p class="muted path">目录：<code>${escape(root)}</code></p>`);
+  return page('流程库', `<h1>流程库</h1><p class="muted">查看已登记流程的说明、原文和文档检查提示。</p><form action="/" method="get" role="search"><label for="q">搜索流程</label><div class="search"><input id="q" name="q" type="search" placeholder="名称、说明或正文" value="${escape(query)}"><button type="submit">搜索</button></div></form><p class="muted">${query ? '匹配' : '已登记'} ${catalog.skills.length} 个流程${query ? ' · <a href="/">查看全部</a>' : ''}</p>${warnings(catalog.findings)}${catalog.skills.length ? `<ul class="rows">${catalog.skills.map(s => `<li><a href="${hrefFor(s)}">${escape(s.id)}</a><p>${escape(s.description)}</p><small class="muted">${s.findings.length ? `${s.findings.length} 项文档提示` : '文档检查：未发现问题'}</small></li>`).join('')}</ul>` : `<div class="empty"><h2>${query ? '没有匹配的流程' : '还没有登记流程'}</h2><p>${query ? '尝试其他关键词，或查看全部流程。' : '通过 CLI 登记已有流程后，这里就会显示。'}</p>${query ? '' : '<code>assetcollector add &lt;流程目录&gt; --namespace &lt;id&gt;</code>'}</div>`}<p class="muted path">目录：<code>${escape(root)}</code></p>`);
 }
-function detail(root, name) {
-  const skill = show(root, name);
-  return page(skill.name, `<a href="/">← 返回流程库</a><h1>${escape(skill.name)}</h1><p>${escape(skill.description)}</p><dl><dt>文件位置</dt><dd><code>${escape(skill.file)}</code></dd><dt>文档检查</dt><dd>${skill.findings.length ? `${skill.findings.length} 项提示` : '未发现问题'}（仅检查文档格式）</dd></dl>${warnings(skill.findings)}<h2>流程原文</h2><pre>${escape(skill.content)}</pre>`);
+function detail(root, qualified) {
+  const skill = show(root, qualified);
+  return page(skill.id, `<a href="/">← 返回流程库</a><h1>${escape(skill.id)}</h1><p>${escape(skill.description)}</p><dl><dt>命名空间</dt><dd><code>${escape(skill.namespace)}</code></dd><dt>文件位置</dt><dd><code>${escape(skill.file)}</code></dd><dt>文档检查</dt><dd>${skill.findings.length ? `${skill.findings.length} 项提示` : '未发现问题'}（仅检查文档格式）</dd></dl>${warnings(skill.findings)}<h2>流程原文</h2><pre>${escape(skill.content)}</pre>`);
 }
 
 /** Serves only catalog views. No resources, write endpoints or execution hooks. */
@@ -34,23 +37,25 @@ export async function startServer(root, port = 4125) {
         const url = new URL(req.url, 'http://localhost');
         if (url.pathname === '/') body = index(root, url.searchParams.get('q') ?? '');
         else {
-          const match = /^\/skills\/([^/]+)$/.exec(url.pathname);
-          const name = match && decodeURIComponent(match[1]);
-          if (!name || !validName(name)) { status = 404; }
-          else body = detail(root, name);
+          const match = /^\/n\/([^/]+)\/([^/]+)$/.exec(url.pathname);
+          if (!match) status = 404;
+          else {
+            const qualified = `${decodeURIComponent(match[1])}/${decodeURIComponent(match[2])}`;
+            parseQualified(qualified);
+            body = detail(root, qualified);
+          }
         }
       }
-    } catch (error) {
-      status = ['not_found', 'invalid_name'].includes(error.code) ? 404 : error instanceof URIError ? 400 : 500;
-      body = page('无法读取', `<h1>${status === 404 ? '流程不存在' : '无法读取流程'}</h1><p>请返回流程库查看文档检查提示。</p><a href="/">返回流程库</a>`);
+    } catch {
+      status = 404;
     }
-    body ??= page('页面不存在', '<h1>页面不存在</h1><a href="/">返回流程库</a>');
+    if (status === 404) body = page('未找到', '<h1>未找到</h1><p>没有这个流程，或路径无效。</p><a href="/">返回流程库</a>');
     res.writeHead(status, headers);
     res.end(req.method === 'HEAD' ? undefined : body);
   });
   await new Promise((resolve, reject) => {
+    server.listen(port, '127.0.0.1', resolve);
     server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => { server.removeListener('error', reject); resolve(); });
   });
   return server;
 }

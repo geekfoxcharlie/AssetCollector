@@ -28,7 +28,7 @@ test('empty catalog is readable without creating directories; HTTP is read-only'
 
 test('list, search and detail escape content and reflect edits without executing resources', async t => {
   const { root, get } = await setup(t);
-  const dir = path.join(root, 'example');
+  const dir = path.join(root, 'shared', 'example');
   mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'SKILL.md');
   const content = '---\nname: example\ndescription: 写作技巧\n---\n<script>alert(1)</script>\n## 检查\n- 核对来源\n';
@@ -36,21 +36,21 @@ test('list, search and detail escape content and reflect edits without executing
   writeFileSync(path.join(dir, 'run.js'), 'throw new Error("must not execute")');
   const index = await get();
   assert.match(index.headers.get('content-security-policy'), /default-src 'none'/);
-  assert.match(await index.text(), /href="\/skills\/example"/);
-  const detail = await (await get('/skills/example')).text();
+  assert.match(await index.text(), /href="\/n\/shared\/example"/);
+  const detail = await (await get('/n/shared/example')).text();
   assert.match(detail, /&lt;script&gt;/);
   assert.doesNotMatch(detail, /<script>/);
   assert.match(await (await get('/?q=missing')).text(), /没有匹配的流程/);
-  assert.match(await (await get('/?q=' + encodeURIComponent('写作'))).text(), /href="\/skills\/example"/);
-  for (const route of ['/skills/example/run.js', '/skills/%2e%2e%2fsecret', '/skills/missing', '/src/web.js']) assert.equal((await get(route)).status, 404);
+  assert.match(await (await get('/?q=' + encodeURIComponent('写作'))).text(), /href="\/n\/shared\/example"/);
+  for (const route of ['/skills/example', '/n/shared/example/run.js', '/n/%2e%2e/secret', '/n/missing/skill', '/src/web.js']) assert.equal((await get(route)).status, 404);
   assert.equal(readFileSync(file, 'utf8'), content);
   writeFileSync(file, content.replace('写作技巧', '更新后的说明'));
   assert.match(await (await get()).text(), /更新后的说明/);
-  mkdirSync(path.join(root, 'broken'));
-  writeFileSync(path.join(root, 'broken', 'SKILL.md'), 'invalid');
+  mkdirSync(path.join(root, 'shared', 'broken'));
+  writeFileSync(path.join(root, 'shared', 'broken', 'SKILL.md'), 'invalid');
   const broken = await (await get()).text();
   assert.match(broken, /文档检查提示/);
-  assert.match(broken, /href="\/skills\/example"/);
+  assert.match(broken, /href="\/n\/shared\/example"/);
 });
 
 test('CLI rejects invalid ports and JSON mode for the server', () => {
